@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CineVault Watchlist</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      background: #0f0f14;
+      color: #e5e7eb;
+    }
+    header {
+      background: #111827;
+      border-bottom: 3px solid #e11d48;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    header h1 { margin: 0; font-size: 1.6rem; }
+    header p { margin: 0.25rem 0 0; color: #9ca3af; font-size: 0.9rem; }
+    #message {
+      max-width: 960px;
+      margin: 1rem auto 0;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      display: none;
+    }
+    #message.success { display: block; background: #064e3b; color: #a7f3d0; }
+    #message.error { display: block; background: #7f1d1d; color: #fecaca; }
+    main {
+      max-width: 960px;
+      margin: 1.5rem auto;
+      padding: 0 1rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+    @media (min-width: 760px) {
+      main { grid-template-columns: 340px 1fr; align-items: start; }
+    }
+    section {
+      background: #1f2937;
+      border-radius: 10px;
+      padding: 1.25rem;
+    }
+    h2 { margin-top: 0; font-size: 1.15rem; }
+    label { display: block; font-size: 0.85rem; margin: 0.75rem 0 0.25rem; color: #cbd5e1; }
+    input, select {
+      width: 100%;
+      padding: 0.55rem;
+      border: 1px solid #374151;
+      border-radius: 6px;
+      background: #111827;
+      color: #e5e7eb;
+      font-size: 1rem;
+    }
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      padding: 0.5rem 0.85rem;
+      font-size: 0.9rem;
+    }
+    .btn-primary {
+      background: #e11d48;
+      color: #fff;
+      width: 100%;
+      margin-top: 1rem;
+      padding: 0.7rem;
+      font-size: 1rem;
+    }
+    .btn-small { background: #374151; color: #e5e7eb; }
+    .btn-danger { background: #7f1d1d; color: #fecaca; }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .stat {
+      background: #111827;
+      border-radius: 8px;
+      padding: 0.75rem;
+      text-align: center;
+    }
+    .stat strong { display: block; font-size: 1.3rem; color: #f43f5e; }
+    .stat span { font-size: 0.75rem; color: #9ca3af; }
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .movie {
+      background: #111827;
+      border-radius: 8px;
+      padding: 0.9rem;
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .movie.watched { opacity: 0.6; }
+    .movie h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+    .movie.watched h3 { text-decoration: line-through; }
+    .meta { font-size: 0.8rem; color: #9ca3af; }
+    .actions { display: flex; gap: 0.4rem; }
+    .empty { color: #9ca3af; text-align: center; padding: 1.5rem 0; }
+    footer {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #6b7280;
+      padding: 2rem 1rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🎞️ CineVault Watchlist</h1>
+    <p>Keep track of the films you want to see and the ones you have already watched.</p>
+  </header>
+
+  <div id="message"></div>
+
+  <main>
+    <section>
+      <h2>Add a film</h2>
+      <form id="add-form">
+        <label for="title">Title</label>
+        <input type="text" id="title" required />
+
+        <label for="year">Year</label>
+        <input type="number" id="year" min="1888" max="2100" required />
+
+        <label for="genre">Genre</label>
+        <select id="genre"></select>
+
+        <label for="rating">Your rating (optional, 1 to 10)</label>
+        <input type="number" id="rating" min="1" max="10" step="1" />
+
+        <button type="submit" class="btn-primary">Add to vault</button>
+      </form>
+    </section>
+
+    <section>
+      <div class="stats">
+        <div class="stat"><strong id="stat-total">0</strong><span>Total</span></div>
+        <div class="stat"><strong id="stat-watched">0</strong><span>Watched</span></div>
+        <div class="stat"><strong id="stat-pending">0</strong><span>To watch</span></div>
+        <div class="stat"><strong id="stat-avg">–</strong><span>Avg rating</span></div>
+      </div>
+
+      <div class="filters">
+        <input type="search" id="search" placeholder="Search title…" />
+        <select id="filter-status">
+          <option value="all">All</option>
+          <option value="pending">To watch</option>
+          <option value="watched">Watched</option>
+        </select>
+        <select id="filter-genre"></select>
+      </div>
+
+      <div id="list"></div>
+    </section>
+  </main>
+
+  <footer>Demo project. Your watchlist is saved only in this browser.</footer>
+
+  <script>
+    const GENRES = [
+      "Action", "Animation", "Comedy", "Documentary", "Drama",
+      "Horror", "Romance", "Sci-Fi", "Thriller", "Other",
+    ];
+    const STORAGE_KEY = "cinevault-movies";
+
+    const $ = (id) => document.getElementById(id);
+    let movies = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+    function saveMovies() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(movies));
+    }
+
+    function showMessage(text, isError = false) {
+      const box = $("message");
+      box.textContent = text;
+      box.className = isError ? "error" : "success";
+    }
+
+    function populateSelects() {
+      const genreSelect = $("genre");
+      GENRES.forEach((g) => genreSelect.add(new Option(g, g)));
+
+      const filterGenre = $("filter-genre");
+      filterGenre.add(new Option("All genres", "all"));
+      GENRES.forEach((g) => filterGenre.add(new Option(g, g)));
+    }
+
+    function addMovie(event) {
+      event.preventDefault();
+      const title = $("title").value.trim();
+      const year = parseInt($("year").value, 10);
+      const genre = $("genre").value;
+      const ratingValue = $("rating").value;
+      const rating = ratingValue === "" ? null : parseInt(ratingValue, 10);
+
+      if (!title) return showMessage("Please enter a title.", true);
+      if (rating !== null && (rating < 1 || rating > 10)) {
+        return showMessage("Rating must be between 1 and 10.", true);
+      }
+
+      const duplicate = movies.some(
+        (m) => m.title.toLowerCase() === title.toLowerCase() && m.year === year
+      );
+      if (duplicate) return showMessage("That film is already in your vault.", true);
+
+      movies.push({
+        id: Date.now().toString(),
+        title,
+        year,
+        genre,
+        rating,
+        watched: false,
+      });
+      saveMovies();
+
+      $("add-form").reset();
+      showMessage(`"${title}" was added to your vault.`);
+      render();
+    }
+
+    function toggleWatched(id) {
+      const movie = movies.find((m) => m.id === id);
+      if (!movie) return;
+      movie.watched = !movie.watched;
+      saveMovies();
+      render();
+    }
+
+    function deleteMovie(id) {
+      const movie = movies.find((m) => m.id === id);
+      if (!movie) return;
+      if (!confirm(`Delete "${movie.title}" from your vault?`)) return;
+
+      movies = movies.filter((m) => m.id !== id);
+      saveMovies();
+      showMessage("Film removed from your vault.");
+      render();
+    }
+
+    function renderStats() {
+      const watchedCount = movies.filter((m) => m.watched).length;
+      const rated = movies.filter((m) => m.rating !== null);
+      const average = rated.length
+        ? (rated.reduce((sum, m) => sum + m.rating, 0) / rated.length).toFixed(1)
+        : "–";
+
+      $("stat-total").textContent = movies.length;
+      $("stat-watched").textContent = watchedCount;
+      $("stat-pending").textContent = movies.length - watchedCount;
+      $("stat-avg").textContent = average;
+    }
+
+    function getFilteredMovies() {
+      const query = $("search").value.trim().toLowerCase();
+      const status = $("filter-status").value;
+      const genre = $("filter-genre").value;
+
+      return movies
+        .filter((m) => !query || m.title.toLowerCase().includes(query))
+        .filter((m) => status === "all" || (status === "watched") === m.watched)
+        .filter((m) => genre === "all" || m.genre === genre)
+        .sort((a, b) => a.title.localeCompare(b.title));
+    }
+
+    function renderList() {
+      const list = $("list");
+      list.innerHTML = "";
+
+      if (movies.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "Your vault is empty. Add your first film!";
+        list.appendChild(empty);
+        return;
+      }
+
+      const items = getFilteredMovies();
+      if (items.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "No films match your filters.";
+        list.appendChild(empty);
+        return;
+      }
+
+      items.forEach((movie) => {
+        const card = document.createElement("div");
+        card.className = "movie" + (movie.watched ? " watched" : "");
+
+        const info = document.createElement("div");
+        const title = document.createElement("h3");
+        title.textContent = movie.title;
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        meta.textContent =
+          `${movie.year} · ${movie.genre}` +
+          (movie.rating !== null ? ` · ★ ${movie.rating}/10` : "");
+        info.append(title, meta);
+
+        const actions = document.createElement("div");
+        actions.className = "actions";
+
+        const toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.className = "btn-small";
+        toggleBtn.textContent = movie.watched ? "Mark as unwatched" : "Mark as watched";
+        toggleBtn.addEventListener("click", () => toggleWatched(movie.id));
+
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "btn-danger";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", () => deleteMovie(movie.id));
+
+        actions.append(toggleBtn, deleteBtn);
+        card.append(info, actions);
+        list.appendChild(card);
+      });
+    }
+
+    function render() {
+      renderStats();
+      renderList();
+    }
+
+    function init() {
+      populateSelects();
+      $("add-form").addEventListener("submit", addMovie);
+
+      ["search", "filter-status", "filter-genre"].forEach((id) => {
+        $(id).addEventListener("input", renderList);
+        $(id).addEventListener("change", renderList);
+      });
+
+      render();
+    }
+
+    init();
+  </script>
+</body>
+</html>
